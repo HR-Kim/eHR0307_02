@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+
+	<!-- DataSource설정 -->
+	<context:property-placeholder location="classpath:resources/config/database.properties"/>
+	<!-- DataSource 
+	destroy-method="close" dataSource close()메소드 call
+	-->
+	<bean id="dataSource" destroy-method="close" class="org.apache.commons.dbcp.BasicDataSource">
+		<property name="driverClassName" value="${jdbc.driver}" />
+		<property name="url" value="${jdbc.url}" />
+		<property name="username" value="${jdbc.username}"/>
+		<property name="password" value="${jdbc.password}"/>
+	</bean>
+	
+	
+	<bean id="mailSender" class="com.ehr.service.DummyMailSender"> </bean>
+<!-- 	<bean id="mailSender"
+		class="org.springframework.mail.javamail.JavaMailSenderImpl">
+		<property name="session" ref="emailSession"></property>
+	</bean> -->
+	<!-- Naver smtp이용 Mail Send -->
+	<bean id="passwordAuth" class="javax.mail.PasswordAuthentication">
+		<constructor-arg>
+			<value>jamesol</value>
+		</constructor-arg>
+		<constructor-arg>
+			<value>사용자비번</value>
+		</constructor-arg>
+	</bean>
+
+	<bean id="authenticator" class="javax.mail.Authenticator">
+		<lookup-method name="getPasswordAuthentication"
+			bean="passwordAuth" />
+	</bean>
+
+	<bean id="emailSession" class="javax.mail.Session">
+		<constructor-arg>
+			<props>
+				<prop key="mail.smtp.host">smtp.naver.com</prop>
+				<prop key="mail.smtp.port">465</prop>
+				<prop key="mail.smtp.auth">true</prop>
+				<prop key="mail.smtp.ssl.enable">true</prop>
+				<prop key="mail.smtp.ssl.trust">smtp.naver.com</prop>
+			</props>
+		</constructor-arg>
+		<constructor-arg ref="authenticator" />
+	</bean>
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+	<!-- Transaction Advice -->
+	<tx:advice id="transactionAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<tx:method name="do_*" read-only="true"/>
+			<tx:method name="*" />
+		</tx:attributes>
+	</tx:advice>
+
+	<aop:config>
+		<aop:pointcut expression="execution(* com.ehr.service.*impl.up*(..))" id="txPointCut"/>
+		<aop:advisor advice-ref="transactionAdvice" pointcut-ref="txPointCut"/>
+	</aop:config>
+
+
+	<!-- Target -->
+	<bean id="userService" class="com.ehr.service.UserServiceImpl">
+		<property name="userDao" ref="userDao" />
+		<property name="mailSender" ref="mailSender" />
+	</bean>
+
+
+
+	<bean id="userDao" class="com.ehr.UserDaoJdbc">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+</beans>
